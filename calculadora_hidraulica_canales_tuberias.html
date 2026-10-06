@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora Hidráulica — Canales y Tuberías (Manning)</title>
+<style>
+  :root{
+    --bg:#f1f5f9; --card:#ffffff; --line:#e2e8f0; --text:#1e293b; --muted:#64748b;
+    --primary:#2563eb; --primary-soft:#dbeafe; --ok:#15803d; --ok-soft:#dcfce7;
+    --bad:#b91c1c; --bad-soft:#fee2e2; --warn:#b45309; --warn-soft:#fef3c7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:14px;line-height:1.4}
+  .wrap{max-width:1280px;margin:0 auto;padding:20px 16px 40px}
+  header h1{margin:0 0 4px;font-size:24px}
+  header p{margin:0 0 18px;color:var(--muted)}
+  main{display:grid;grid-template-columns:370px 1fr;gap:18px;align-items:start}
+  @media (max-width:920px){main{grid-template-columns:1fr}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .panel h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .stack{display:flex;flex-direction:column;gap:18px;min-width:0}
+
+  .seg{display:flex;gap:6px;margin-bottom:14px}
+  .seg button{flex:1;padding:8px 6px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font:inherit;font-weight:600;color:var(--text);cursor:pointer}
+  .seg button.on{background:var(--primary);border-color:var(--primary);color:#fff}
+  .seg-label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block}
+
+  .row{margin-bottom:13px}
+  .row-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:3px}
+  .row-head label{font-weight:500}
+  .inp{display:flex;align-items:center;gap:5px}
+  .inp input,.inp select, .lim input, select.full{font:inherit;padding:4px 6px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:var(--text)}
+  .inp input{width:96px;text-align:right;font-weight:700;color:var(--primary)}
+  .inp em{font-style:normal;color:var(--muted);font-size:12px;min-width:30px}
+  .row input[type=range]{width:100%;accent-color:var(--primary);margin:2px 0 0}
+  .hint{font-size:12px;color:var(--muted);margin-top:1px}
+  select.full{width:100%;margin-top:4px}
+  .sep{border:0;border-top:1px solid var(--line);margin:14px 0}
+
+  details{border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
+  summary{cursor:pointer;font-weight:600}
+  .lim{display:grid;grid-template-columns:1fr 84px 34px;gap:6px 8px;align-items:center;margin-top:10px}
+  .lim input{width:100%;text-align:right}
+  .lim span{color:var(--muted);font-size:12px}
+
+  canvas{width:100%;display:block}
+  #cv-sec{height:340px}
+  #cv-curve{height:250px}
+
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media (max-width:700px){.cards{grid-template-columns:repeat(2,1fr)}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 8px;text-align:center}
+  .card .k{font-size:11px;text-transform:uppercase;font-weight:600;color:var(--muted)}
+  .card .v{font-size:19px;font-weight:700;margin-top:2px}
+  .card .v small{font-size:12px;font-weight:400;color:var(--muted)}
+  .card .n{font-size:11px;color:var(--muted);margin-top:1px}
+  .card.main{border-bottom:4px solid var(--primary)}
+  .card.main .v{color:var(--primary)}
+  .group-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 7px}
+  .group-title:first-child{margin-top:0}
+
+  .checks{display:flex;flex-wrap:wrap;gap:7px}
+  .chk{padding:5px 10px;border-radius:999px;font-size:12.5px;font-weight:600}
+  .chk.ok{background:var(--ok-soft);color:var(--ok)}
+  .chk.bad{background:var(--bad-soft);color:var(--bad)}
+  .msg{padding:10px 12px;border-radius:9px;margin-bottom:10px;font-weight:500}
+  .msg.err{background:var(--bad-soft);color:var(--bad)}
+  .msg.warn{background:var(--warn-soft);color:var(--warn)}
+  .bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .btn{font:inherit;font-weight:600;padding:6px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;color:var(--text)}
+  .btn:hover{background:var(--primary-soft)}
+  footer{margin-top:18px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Calculadora Hidráulica — Canales y Tuberías</h1>
+    <p>Flujo uniforme a superficie libre con la ecuación de Manning. Sección trapezoidal (incluye rectangular y triangular) o tubería circular parcialmente llena.</p>
+  </header>
+
+  <main>
+    <div class="panel">
+      <span class="seg-label">Tipo de sección</span>
+      <div class="seg" id="seg-sec">
+        <button data-v="trap" class="on">Canal trapezoidal</button>
+        <button data-v="circ">Tubería circular</button>
+      </div>
+
+      <span class="seg-label">Modo de cálculo</span>
+      <div class="seg" id="seg-mode">
+        <button data-v="q" class="on">Calcular Q (dado y)</button>
+        <button data-v="y">Calcular y (dado Q)</button>
+      </div>
+
+      <span class="seg-label">Unidad de caudal</span>
+      <div class="seg" id="seg-unit">
+        <button data-v="m3s" class="on">m³/s</button>
+        <button data-v="lps">L/s</button>
+      </div>
+
+      <hr class="sep">
+      <div id="fields"></div>
+
+      <details>
+        <summary>Criterios de verificación (editables)</summary>
+        <div class="lim">
+          <label for="lim-vmin">Velocidad mínima</label><input id="lim-vmin" type="number" step="any" value="0.45"><span>m/s</span>
+          <label for="lim-vmax">Velocidad máxima</label><input id="lim-vmax" type="number" step="any" value="5"><span>m/s</span>
+          <label for="lim-tau">Esfuerzo cortante mínimo</label><input id="lim-tau" type="number" step="any" value="1"><span>Pa</span>
+          <label for="lim-yd">Llenado máximo y/D (tubería)</label><input id="lim-yd" type="number" step="any" value="85"><span>%</span>
+        </div>
+        <p class="hint">Valores de referencia; ajústalos a la norma y al tipo de sistema (sanitario, pluvial, canal revestido, etc.).</p>
+      </details>
+    </div>
+
+    <div class="stack">
+      <div class="panel"><canvas id="cv-sec"></canvas></div>
+
+      <div class="panel">
+        <div class="bar">
+          <h2 style="margin:0">Resultados</h2>
+          <button class="btn" id="btn-copy">Copiar resultados</button>
+        </div>
+        <div id="msgs"></div>
+        <div id="results"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Curva de capacidad (tirante vs. caudal)</h2>
+        <canvas id="cv-curve"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    Q = (1/n)·A·R<sup>2/3</sup>·S<sup>1/2</sup> · Fr = V/√(g·A/T) · τ = γ·R·S (γ = 9810 N/m³) · E = y + V²/2g.
+    En tuberías, el caudal máximo a flujo libre ocurre en y/D ≈ 0.938; para "calcular y" se toma la solución por debajo de ese punto.
+  </footer>
+</div>
+
+<script>
+// <hidraulica>
+const G = 9.81, GAMMA = 9810, YD_QMAX = 0.93818;
+
+function geomTrap(y, b, z){
+  return { A: y*(b + z*y), P: b + 2*y*Math.sqrt(1 + z*z), T: b + 2*z*y };
+}
+function geomCirc(y, D){
+  const yy = Math.min(Math.max(y, 0), D);
+  const th = 2*Math.acos(1 - 2*yy/D);
+  return { A: D*D/8*(th - Math.sin(th)), P: D*th/2, T: Math.max(0, D*Math.sin(th/2)) };
+}
+function manningQ(g, S, n){
+  return (g.A > 0 && g.P > 0) ? g.A*Math.pow(g.A/g.P, 2/3)*Math.sqrt(S)/n : 0;
+}
+// f creciente en [lo, hi]
+function bisect(f, lo, hi){
+  for (let i = 0; i < 100; i++){
+    const m = (lo + hi)/2;
+    if (f(m) < 0) lo = m; else hi = m;
+  }
+  return (lo + hi)/2;
+}
+// yCap: tirante tope de búsqueda (tuberías). Devuelve null si Q excede la capacidad.
+function normalDepth(Q, qOf, yCap){
+  if (yCap){
+    if (qOf(yCap) < Q) return null;
+    return bisect(y => qOf(y) - Q, 0, yCap);
+  }
+  let hi = 1;
+  while (qOf(hi) < Q && hi < 1e5) hi *= 2;
+  return bisect(y => qOf(y) - Q, 0, hi);
+}
+function criticalDepth(Q, geo, yCap){
+  const f = y => { const g = geo(y); return g.T > 0 ? Math.pow(g.A, 3)/g.T - Q*Q/G : -1; };
+  let hi = yCap || 1;
+  if (!yCap) while (f(hi) < 0 && hi < 1e5) hi *= 2;
+  return bisect(f, 0, hi);
+}
+// </hidraulica>
+
+// ---------- Estado y campos ----------
+const state = { sec:'trap', mode:'q', unit:{trap:'m3s', circ:'lps'}, v:{} };
+let last = null;
+
+const MATERIALES = [
+  ['PVC / PEAD / GRP', 0.009], ['Concreto prefabricado / gres', 0.013], ['Concreto fundido en sitio', 0.015],
+  ['Mampostería / piedra pegada', 0.020], ['Tierra limpia', 0.022], ['Tierra con vegetación', 0.030]
+];
+
+const FIELDS = [
+  {k:'b',  label:'Ancho de base, b', unit:'m',   min:0,      max:10,   step:0.05,   val:2,     show:s=>s.sec==='trap'},
+  {k:'z',  label:'Talud, z (H:V)',   unit:'z:1', min:0,      max:4,    step:0.05,   val:1.5,   show:s=>s.sec==='trap',
+     hint:v=> v===0 ? 'Sección rectangular' : ''},
+  {k:'BL', label:'Borde libre',      unit:'m',   min:0,      max:2,    step:0.05,   val:0.3,   show:s=>s.sec==='trap'},
+  {k:'D',  label:'Diámetro interno, D', unit:'mm', min:100,  max:3000, step:5,      val:400,   show:s=>s.sec==='circ'},
+  {k:'S',  label:'Pendiente, S',     unit:'m/m', min:0.0001, max:0.1,  step:0.0001, val:0.001, show:()=>true,
+     hint:v=> v>0 ? '= ' + (v*100).toFixed(3) + ' %' : ''},
+  {k:'n',  label:'Rugosidad de Manning, n', unit:'', min:0.008, max:0.1, step:0.001, val:0.013, show:()=>true, material:true},
+  {k:'y',  label:'Tirante, y',       unit:'m',   min:0.01,   max:5,    step:0.01,   val:1,     show:s=>s.sec==='trap' && s.mode==='q'},
+  {k:'yD', label:'Llenado, y/D',     unit:'%',   min:1,      max:100,  step:0.5,    val:75,    show:s=>s.sec==='circ' && s.mode==='q'},
+  {k:'Qt', label:'Caudal, Q', q:'trap', base:{min:0.01,   max:100, step:0.01},   val:5,   show:s=>s.sec==='trap' && s.mode==='y'},
+  {k:'Qc', label:'Caudal, Q', q:'circ', base:{min:0.0001, max:5,   step:0.0001}, val:100, show:s=>s.sec==='circ' && s.mode==='y'}
+];
+
+const $ = id => document.getElementById(id);
+const qFactor = sec => state.unit[sec] === 'lps' ? 1000 : 1;
+const qUnitTxt = sec => state.unit[sec] === 'lps' ? 'L/s' : 'm³/s';
+const fmt = (x, d) => (isFinite(x) ? x.toFixed(d) : '—');
+const fmtQ = Qm3 => state.unit[state.sec] === 'lps' ? fmt(Qm3*1000, 2) : fmt(Qm3, Qm3 < 1 ? 4 : 3);
+
+function buildFields(){
+  const box = $('fields');
+  FIELDS.forEach(f => {
+    state.v[f.k] = f.val;
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML =
+      '<div class="row-head"><label for="n-'+f.k+'">'+f.label+'</label>' +
+      '<span class="inp"><input id="n-'+f.k+'" type="number" step="any" value="'+f.val+'"><em></em></span></div>' +
+      '<input type="range" aria-label="'+f.label+'">' +
+      (f.material ? '<select class="full" aria-label="Material"></select>' : '') +
+      '<div class="hint"></div>';
+    box.appendChild(row);
+    f.row = row;
+    f.num = row.querySelector('input[type=number]');
+    f.rng = row.querySelector('input[type=range]');
+    f.unitEl = row.querySelector('em');
+    f.hintEl = row.querySelector('.hint');
+    setRange(f);
+
+    f.num.addEventListener('input', () => {
+      state.v[f.k] = parseFloat(f.num.value);
+      f.rng.value = state.v[f.k];
+      if (f.material) syncMaterial(f);
+      update();
+    });
+    f.rng.addEventListener('input', () => {
+      state.v[f.k] = parseFloat(f.rng.value);
+      f.num.value = f.rng.value;
+      if (f.material) syncMaterial(f);
+      update();
+    });
+
+    if (f.material){
+      f.sel = row.querySelector('select');
+      f.sel.innerHTML = '<option value="">Personalizado</option>' +
+        MATERIALES.map(m => '<option value="'+m[1]+'">'+m[0]+' — n = '+m[1].toFixed(3)+'</option>').join('');
+      f.sel.addEventListener('change', () => {
+        if (!f.sel.value) return;
+        state.v[f.k] = parseFloat(f.sel.value);
+        f.num.value = f.sel.value; f.rng.value = f.sel.value;
+        update();
+      });
+      syncMaterial(f);
+    }
+  });
+}
+function syncMaterial(f){
+  const m = MATERIALES.find(m => Math.abs(m[1] - state.v[f.k]) < 1e-9);
+  f.sel.value = m ? String(m[1]) : '';
+}
+function setRange(f){
+  if (f.q){
+    const k = qFactor(f.q);
+    f.rng.min = f.base.min*k; f.rng.max = f.base.max*k; f.rng.step = f.base.step*k;
+    f.unitEl.textContent = qUnitTxt(f.q);
+  } else {
+    f.rng.min = f.min; f.rng.max = f.max; f.rng.step = f.step;
+    f.unitEl.textContent = f.unit;
+  }
+  f.rng.value = state.v[f.k];
+}
+
+function bindSeg(id, onPick){
+  const box = $(id);
+  box.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    onPick(b.dataset.v);
+    update();
+  });
+}
+function paintSeg(id, val){
+  $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === val));
+}
+
+// ---------- Cálculo ----------
+function compute(){
+  const v = state.v, circ = state.sec === 'circ';
+  const S = v.S, n = v.n, err = [];
+  if (!(S > 0)) err.push('La pendiente debe ser mayor que cero.');
+  if (!(n > 0)) err.push('La rugosidad n debe ser mayor que cero.');
+
+  let geo, D = null, b = null, z = null;
+  if (circ){
+    D = v.D/1000;
+    if (!(D > 0)) err.push('El diámetro debe ser mayor que cero.');
+    geo = y => geomCirc(y, D);
+  } else {
+    b = v.b; z = v.z;
+    if (!(b >= 0) || !(z >= 0) || (b === 0 && z === 0)) err.push('Revisa la geometría: b y z no pueden ser negativos ni ambos cero.');
+    if (!(v.BL >= 0)) err.push('El borde libre no puede ser negativo.');
+    geo = y => geomTrap(y, b, z);
+  }
+  if (err.length) return {err};
+
+  const qOf = y => manningQ(geo(y), S, n);
+  let y, Q;
+  if (state.mode === 'q'){
+    if (circ){
+      if (!(v.yD > 0 && v.yD <= 100)) return {err:['El llenado y/D debe estar entre 0 y 100 %.']};
+      y = v.yD/100*D;
+    } else {
+      y = v.y;
+      if (!(y > 0)) return {err:['El tirante debe ser mayor que cero.']};
+    }
+    Q = qOf(y);
+  } else {
+    Q = (circ ? v.Qc : v.Qt)/qFactor(state.sec);
+    if (!(Q > 0)) return {err:['El caudal debe ser mayor que cero.']};
+    y = normalDepth(Q, qOf, circ ? YD_QMAX*D : null);
+    if (y === null){
+      return {err:['El caudal supera la capacidad máxima a flujo libre de la tubería (Qmáx = ' + fmtQ(qOf(YD_QMAX*D)) + ' ' +
+        qUnitTxt('circ') + '). Trabajaría a presión: aumenta el diámetro o la pendiente.']};
+    }
+  }
+
+  const g = geo(y);
+  const r = { circ, y, Q, S, n, A:g.A, P:g.P, T:g.T, R:g.A/g.P, geo, qOf, D, b, z };
+  r.V = Q/g.A;
+  r.hv = r.V*r.V/(2*G);
+  r.E = y + r.hv;
+  r.tau = GAMMA*r.R*S;
+  r.full = circ && y >= D*(1 - 1e-6);
+  r.Fr = (g.T > 1e-9 && !r.full) ? r.V/Math.sqrt(G*g.A/g.T) : null;
+  r.yc = criticalDepth(Q, geo, circ ? D*(1 - 1e-9) : null);
+  const gc = geo(r.yc);
+  r.Sc = Math.pow(Q*n/(gc.A*Math.pow(gc.A/gc.P, 2/3)), 2);
+
+  if (circ){
+    r.yD = y/D;
+    const gf = geomCirc(D, D);
+    r.Qfull = manningQ(gf, S, n);
+    r.Vfull = r.Qfull/gf.A;
+    r.Qmax = qOf(YD_QMAX*D);
+    const lim = parseFloat($('lim-yd').value)/100;
+    if (lim > 0 && lim <= 1) r.Dreq = D*Math.pow(Q/qOf(lim*D), 3/8);
+  } else {
+    r.BL = v.BL;
+    r.H = y + v.BL;
+    r.Ttop = b + 2*z*r.H;
+  }
+  return r;
+}
+
+// ---------- Resultados ----------
+function card(k, v, u, note, main){
+  return '<div class="card'+(main?' main':'')+'"><div class="k">'+k+'</div><div class="v">'+v+
+         (u ? ' <small>'+u+'</small>' : '')+'</div>'+(note ? '<div class="n">'+note+'</div>' : '')+'</div>';
+}
+function regimen(Fr){
+  if (Fr === null) return 'Tubo lleno';
+  if (Fr < 0.9) return 'Subcrítico';
+  if (Fr > 1.1) return 'Supercrítico';
+  return 'Crítico (inestable)';
+}
+function renderResults(r){
+  const U = qUnitTxt(state.sec);
+  let h = '<div class="group-title">Flujo</div><div class="cards">';
+  h += card('Tirante (y)', fmt(r.y,3), 'm', r.circ ? 'y/D = '+fmt(r.yD*100,1)+' %' : '', state.mode==='y');
+  h += card('Caudal (Q)', fmtQ(r.Q), U, '', state.mode==='q');
+  h += card('Velocidad (V)', fmt(r.V,2), 'm/s');
+  h += card('Froude (Fr)', r.Fr===null ? '—' : fmt(r.Fr,2), '', regimen(r.Fr));
+  h += '</div><div class="group-title">Geometría</div><div class="cards">';
+  h += card('Área (A)', fmt(r.A,4), 'm²');
+  h += card('Perímetro mojado (P)', fmt(r.P,3), 'm');
+  h += card('Radio hidráulico (R)', fmt(r.R,4), 'm');
+  h += card('Espejo de agua (T)', fmt(r.T,3), 'm');
+  h += '</div><div class="group-title">Energía y flujo crítico</div><div class="cards">';
+  h += card('Tirante crítico (yc)', fmt(r.yc,3), 'm', r.y > r.yc ? 'y &gt; yc' : 'y &lt; yc');
+  h += card('Pendiente crítica (Sc)', fmt(r.Sc,5), 'm/m', r.S < r.Sc ? 'Pendiente suave' : 'Pendiente fuerte');
+  h += card('Energía específica (E)', fmt(r.E,3), 'm', 'V²/2g = '+fmt(r.hv,3)+' m');
+  h += card('Esfuerzo cortante (τ)', fmt(r.tau,2), 'Pa');
+  h += '</div>';
+  if (r.circ){
+    h += '<div class="group-title">Tubería</div><div class="cards">';
+    h += card('Q a tubo lleno (Qo)', fmtQ(r.Qfull), U, 'Vo = '+fmt(r.Vfull,2)+' m/s');
+    h += card('Q / Qo', fmt(r.Q/r.Qfull,3), '', 'V/Vo = '+fmt(r.V/r.Vfull,3));
+    h += card('Q máx. flujo libre', fmtQ(r.Qmax), U, 'en y/D = 0.938');
+    h += card('D mínimo requerido', r.Dreq ? fmt(r.Dreq*1000,0) : '—', 'mm', 'para y/D ≤ '+$('lim-yd').value+' %');
+    h += '</div>';
+  } else {
+    h += '<div class="group-title">Canal</div><div class="cards">';
+    h += card('Altura total (H)', fmt(r.H,3), 'm', 'y + borde libre');
+    h += card('Ancho superior', fmt(r.Ttop,3), 'm', 'a la altura H');
+    h += card('Prof. hidráulica (A/T)', fmt(r.A/r.T,3), 'm');
+    h += card('Borde libre / y', fmt(r.BL/r.y*100,0), '%');
+    h += '</div>';
+  }
+
+  const vmin = parseFloat($('lim-vmin').value), vmax = parseFloat($('lim-vmax').value),
+        tmin = parseFloat($('lim-tau').value), ydm = parseFloat($('lim-yd').value);
+  const ck = [];
+  const add = (ok, txt) => ck.push('<span class="chk '+(ok?'ok':'bad')+'">'+(ok?'✔':'✖')+' '+txt+'</span>');
+  if (vmin >= 0) add(r.V >= vmin, 'V ≥ '+vmin+' m/s');
+  if (vmax > 0)  add(r.V <= vmax, 'V ≤ '+vmax+' m/s');
+  if (tmin >= 0) add(r.tau >= tmin, 'τ ≥ '+tmin+' Pa');
+  if (r.circ && ydm > 0) add(r.yD*100 <= ydm + 1e-9, 'y/D ≤ '+ydm+' %');
+  if (r.Fr !== null) add(r.Fr < 0.9 || r.Fr > 1.1, 'Fr fuera de 0.9 – 1.1');
+  h += '<div class="group-title">Verificaciones</div><div class="checks">'+ck.join('')+'</div>';
+  $('results').innerHTML = h;
+
+  const w = [];
+  if (r.circ && r.yD > YD_QMAX + 1e-6) w.push('Por encima de y/D ≈ 0.94 el caudal disminuye al aumentar el tirante: zona inestable, cercana al flujo a presión.');
+  $('msgs').innerHTML = w.map(t => '<div class="msg warn">'+t+'</div>').join('');
+}
+
+// ---------- Dibujo ----------
+function setupCanvas(c){
+  const dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  c.width = Math.round(W*dpr); c.height = Math.round(H*dpr);
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  return {ctx, W, H};
+}
+function dimV(ctx, x, y1, y2, text, side){
+  ctx.save();
+  ctx.strokeStyle = '#64748b'; ctx.fillStyle = '#334155'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, y1); ctx.lineTo(x, y2);
+  ctx.moveTo(x-5, y1); ctx.lineTo(x+5, y1);
+  ctx.moveTo(x-5, y2); ctx.lineTo(x+5, y2);
+  ctx.stroke();
+  ctx.translate(x, (y1+y2)/2); ctx.rotate(-Math.PI/2);
+  ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(text, 0, side === 'left' ? -8 : 16);
+  ctx.restore();
+}
+function dimH(ctx, x1, x2, y, text){
+  ctx.save();
+  ctx.strokeStyle = '#64748b'; ctx.fillStyle = '#334155'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x1, y); ctx.lineTo(x2, y);
+  ctx.moveTo(x1, y-5); ctx.lineTo(x1, y+5);
+  ctx.moveTo(x2, y-5); ctx.lineTo(x2, y+5);
+  ctx.stroke();
+  ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(text, (x1+x2)/2, y + 17);
+  ctx.restore();
+}
+function nabla(ctx, x, y){
+  ctx.save();
+  ctx.fillStyle = '#2563eb'; ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x-6, y-10); ctx.lineTo(x+6, y-10); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function dashed(ctx, x1, x2, y, label){
+  ctx.save();
+  ctx.setLineDash([6,4]); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+  ctx.setLineDash([]); ctx.fillStyle = '#ef4444'; ctx.font = '12px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(label, x1 + 6, y - 4);
+  ctx.restore();
+}
+
+function drawTrap(r){
+  const {ctx, W, H} = setupCanvas($('cv-sec'));
+  const Ht = r.H, b = r.b, z = r.z, y = r.y;
+  const mL = 70, mR = 110, mT = 34, mB = 58;
+  const scale = Math.min((W - mL - mR)/Math.max(r.Ttop, 1e-6), (H - mT - mB)/Math.max(Ht, 1e-6));
+  const cx = mL + (W - mL - mR)/2, by = H - mB;
+  const blx = cx - b/2*scale, brx = cx + b/2*scale;
+  const ty = by - Ht*scale, tlx = blx - z*Ht*scale, trx = brx + z*Ht*scale;
+  const wy = by - y*scale, wlx = blx - z*y*scale, wrx = brx + z*y*scale;
+
+  ctx.beginPath(); ctx.moveTo(blx, by); ctx.lineTo(brx, by); ctx.lineTo(wrx, wy); ctx.lineTo(wlx, wy); ctx.closePath();
+  ctx.fillStyle = '#bfdbfe'; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(wlx, wy); ctx.lineTo(wrx, wy); ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2; ctx.stroke();
+  nabla(ctx, cx, wy);
+  ctx.fillStyle = '#1d4ed8'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('T = ' + fmt(r.T,2) + ' m', cx, wy - 16);
+
+  if (r.yc < Ht){
+    const cy = by - r.yc*scale;
+    dashed(ctx, blx - z*r.yc*scale, brx + z*r.yc*scale, cy, 'yc = ' + fmt(r.yc,2) + ' m');
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(tlx - 40, ty); ctx.lineTo(tlx, ty); ctx.lineTo(blx, by); ctx.lineTo(brx, by); ctx.lineTo(trx, ty); ctx.lineTo(trx + 40, ty);
+  ctx.strokeStyle = '#475569'; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.stroke();
+
+  if (b > 0) dimH(ctx, blx, brx, by + 22, 'b = ' + fmt(b,2) + ' m');
+  dimV(ctx, trx + 55, by, wy, 'y = ' + fmt(y,2) + ' m', 'left');
+  if (r.BL > 0) dimV(ctx, trx + 90, by, ty, 'H = ' + fmt(Ht,2) + ' m', 'left');
+
+  if (z > 0){
+    const t = Math.min(30, Ht*scale*0.35);
+    const my = by - Ht*scale*0.25, mx = blx - z*Ht*0.25*scale;
+    ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx - z*t, my - t); ctx.lineTo(mx - z*t, my); ctx.closePath();
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#ef4444'; ctx.font = '12px sans-serif';
+    ctx.textAlign = 'right'; ctx.fillText('1', mx - z*t - 5, my - t/2 + 4);
+    ctx.textAlign = 'center'; ctx.fillText(fmt(z,2), mx - z*t/2, my + 14);
+  }
+}
+
+function drawCirc(r){
+  const {ctx, W, H} = setupCanvas($('cv-sec'));
+  const rad = Math.max(10, Math.min((W - 240)/2, (H - 60)/2));
+  const cx = W/2, cy = H/2, scale = 2*rad/r.D, by = cy + rad;
+  const half = yy => Math.sqrt(Math.max(0, rad*rad - Math.pow(rad - yy*scale, 2)));
+  const th = 2*Math.acos(1 - 2*Math.min(r.y, r.D)/r.D);
+  const wy = by - r.y*scale;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, rad, Math.PI/2 - th/2, Math.PI/2 + th/2);
+  ctx.closePath(); ctx.fillStyle = '#bfdbfe'; ctx.fill();
+  if (!r.full){
+    const hw = half(r.y);
+    ctx.beginPath(); ctx.moveTo(cx - hw, wy); ctx.lineTo(cx + hw, wy); ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2; ctx.stroke();
+    nabla(ctx, cx, wy);
+  }
+  if (r.yc < r.D*0.999){
+    const hc = half(r.yc);
+    dashed(ctx, cx - hc, cx + hc, by - r.yc*scale, 'yc = ' + fmt(r.yc,3) + ' m');
+  }
+  ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 2*Math.PI); ctx.strokeStyle = '#475569'; ctx.lineWidth = 5; ctx.stroke();
+
+  dimV(ctx, cx - rad - 30, by, cy - rad, 'D = ' + fmt(r.D*1000,0) + ' mm', 'left');
+  dimV(ctx, cx + rad + 30, by, wy, 'y = ' + fmt(r.y,3) + ' m', 'right');
+  ctx.fillStyle = '#334155'; ctx.font = '13px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('y/D = ' + fmt(r.yD*100,1) + ' %', cx + rad + 58, cy - 6);
+  ctx.fillText('Q/Qo = ' + fmt(r.Q/r.Qfull,2), cx + rad + 58, cy + 14);
+}
+
+function drawCurve(r){
+  const {ctx, W, H} = setupCanvas($('cv-curve'));
+  const k = qFactor(state.sec), N = 100;
+  const yTop = r.circ ? r.D : Math.max(r.H, r.y*1.25);
+  const pts = [];
+  let qMax = r.Q;
+  for (let i = 0; i <= N; i++){
+    const yy = yTop*i/N, q = r.qOf(yy);
+    pts.push([q, yy]); if (q > qMax) qMax = q;
+  }
+  qMax *= 1.06;
+  const mL = 54, mR = 18, mT = 12, mB = 40, pw = W - mL - mR, ph = H - mT - mB;
+  const X = q => mL + q/qMax*pw, Y = yy => mT + ph - yy/yTop*ph;
+  const tick = x => String(Number(x.toPrecision(3)));
+
+  ctx.font = '11px sans-serif'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++){
+    const gx = mL + pw*i/5, gy = mT + ph*i/5;
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.beginPath(); ctx.moveTo(gx, mT); ctx.lineTo(gx, mT + ph); ctx.moveTo(mL, gy); ctx.lineTo(mL + pw, gy); ctx.stroke();
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'center'; ctx.fillText(tick(qMax*k*i/5), gx, mT + ph + 14);
+    ctx.textAlign = 'right';  ctx.fillText(tick(yTop*(5 - i)/5), mL - 6, gy + 4);
+  }
+  ctx.fillStyle = '#334155'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Q (' + qUnitTxt(state.sec) + ')', mL + pw/2, H - 6);
+  ctx.save(); ctx.translate(13, mT + ph/2); ctx.rotate(-Math.PI/2); ctx.fillText('y (m)', 0, 0); ctx.restore();
+
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])));
+  ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2; ctx.stroke();
+
+  if (r.yc <= yTop){
+    ctx.save(); ctx.setLineDash([6,4]); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(mL, Y(r.yc)); ctx.lineTo(mL + pw, Y(r.yc)); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = '#ef4444'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText('yc', mL + pw - 4, Y(r.yc) - 4); ctx.restore();
+  }
+  const px = X(r.Q), py = Y(Math.min(r.y, yTop));
+  ctx.save(); ctx.setLineDash([3,3]); ctx.strokeStyle = '#94a3b8';
+  ctx.beginPath(); ctx.moveTo(px, mT + ph); ctx.lineTo(px, py); ctx.lineTo(mL, py); ctx.stroke(); ctx.restore();
+  ctx.beginPath(); ctx.arc(px, py, 5, 0, 2*Math.PI); ctx.fillStyle = '#1d4ed8'; ctx.fill();
+}
+
+// ---------- Ciclo principal ----------
+function update(){
+  paintSeg('seg-sec', state.sec); paintSeg('seg-mode', state.mode); paintSeg('seg-unit', state.unit[state.sec]);
+  FIELDS.forEach(f => {
+    f.row.style.display = f.show(state) ? '' : 'none';
+    f.hintEl.textContent = f.hint ? f.hint(state.v[f.k]) : '';
+  });
+  const r = compute();
+  if (r.err){
+    last = null;
+    $('msgs').innerHTML = r.err.map(t => '<div class="msg err">'+t+'</div>').join('');
+    $('results').innerHTML = '';
+    setupCanvas($('cv-sec')); setupCanvas($('cv-curve'));
+    return;
+  }
+  last = r;
+  renderResults(r);
+  r.circ ? drawCirc(r) : drawTrap(r);
+  drawCurve(r);
+}
+
+function copyResults(){
+  if (!last) return;
+  const r = last, U = qUnitTxt(state.sec), k = qFactor(state.sec), L = [];
+  const add = (a, b, c) => L.push([a, b, c || ''].join('\t'));
+  add('Parámetro', 'Valor', 'Unidad');
+  add('Sección', r.circ ? 'Tubería circular' : 'Canal trapezoidal');
+  if (r.circ) add('Diámetro interno D', (r.D*1000).toFixed(0), 'mm');
+  else { add('Ancho de base b', r.b, 'm'); add('Talud z', r.z, 'z:1'); add('Borde libre', r.BL, 'm'); }
+  add('Pendiente S', r.S, 'm/m'); add('Manning n', r.n);
+  add('Tirante y', r.y.toFixed(4), 'm');
+  if (r.circ) add('y/D', (r.yD*100).toFixed(2), '%');
+  add('Caudal Q', (r.Q*k).toFixed(k === 1 ? 5 : 3), U);
+  add('Velocidad V', r.V.toFixed(3), 'm/s');
+  add('Froude', r.Fr === null ? '' : r.Fr.toFixed(3), regimen(r.Fr));
+  add('Área A', r.A.toFixed(5), 'm²'); add('Perímetro mojado P', r.P.toFixed(4), 'm');
+  add('Radio hidráulico R', r.R.toFixed(5), 'm'); add('Espejo de agua T', r.T.toFixed(4), 'm');
+  add('Tirante crítico yc', r.yc.toFixed(4), 'm'); add('Pendiente crítica Sc', r.Sc.toFixed(6), 'm/m');
+  add('Energía específica E', r.E.toFixed(4), 'm'); add('Esfuerzo cortante τ', r.tau.toFixed(3), 'Pa');
+  if (r.circ){
+    add('Q tubo lleno Qo', (r.Qfull*k).toFixed(k === 1 ? 5 : 3), U); add('V tubo lleno Vo', r.Vfull.toFixed(3), 'm/s');
+    add('Q/Qo', (r.Q/r.Qfull).toFixed(4)); add('V/Vo', (r.V/r.Vfull).toFixed(4));
+    if (r.Dreq) add('D mínimo requerido', (r.Dreq*1000).toFixed(0), 'mm');
+  } else { add('Altura total H', r.H.toFixed(3), 'm'); add('Ancho superior', r.Ttop.toFixed(3), 'm'); }
+  const text = L.join('\n'), btn = $('btn-copy');
+  const done = () => { btn.textContent = 'Copiado ✔'; setTimeout(() => btn.textContent = 'Copiar resultados', 1500); };
+  const fallback = () => {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+    ta.select(); try { document.execCommand('copy'); done(); } catch(e){} ta.remove();
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+  else fallback();
+}
+
+if (typeof document !== 'undefined'){
+  buildFields();
+  bindSeg('seg-sec',  v => { state.sec = v; });
+  bindSeg('seg-mode', v => { state.mode = v; });
+  bindSeg('seg-unit', v => {
+    const sec = state.sec; if (state.unit[sec] === v) return;
+    const f = FIELDS.find(f => f.q === sec);
+    state.v[f.k] = Number((state.v[f.k]*(v === 'lps' ? 1000 : 0.001)).toPrecision(10));
+    state.unit[sec] = v;
+    f.num.value = state.v[f.k];
+    setRange(f);
+  });
+  ['lim-vmin','lim-vmax','lim-tau','lim-yd'].forEach(id => $(id).addEventListener('input', update));
+  $('btn-copy').addEventListener('click', copyResults);
+  window.addEventListener('resize', update);
+  update();
+}
+</script>
+</body>
+</html>
